@@ -1,0 +1,102 @@
+<!--
+TODO:
+* Reconnect on disconnect.
+-->
+
+<html>
+  <head>
+    <title>Webchat demo</title>
+    <link rel="stylesheet" href="/static/bootstrap.min.css">
+    <script src="/static/vue.js"></script>
+    <script src="/static/axios.min.js"></script>
+  </head>
+
+  <style>
+    #chat {
+      text-align: left;
+      background: #f1f1f1;
+      height: 300px;
+      padding: 20px;
+      overflow-y: scroll;
+    }
+  </style>
+
+  <body>
+    <div id="app">
+       <div class="container">
+         <h1>Webchat demo</h1>
+         <div class="row">
+           <div class="col">
+             <pre id="chat"></pre>
+            </div>
+         </div>
+         <div class="row">
+           <div class="col">
+             <form class="form-inline" @submit.prevent>
+               <label class="sr-only" for="name">Name</label>
+               <input id="name" type="text" class="form-control mb-2 mr-sm-2 mb-sm-0"
+                 placeholder="Name" v-model="name">
+               <label class="sr-only" for="message">Message</label>
+               <input id="message" type="text" class="form-control col-lg mb-2 mr-sm-2 mb-sm-0"
+                 placeholder="Message" autofocus v-model="message" @keydown.enter="onSubmit">
+             </form>
+           </div>
+       </div>
+       </div>
+    </div>
+
+    <script>
+      var now = function () {
+        var iso = new Date().toISOString();
+        return iso.split("T")[1].split(".")[0];
+      };
+
+      var app = new Vue({
+        el: '#app',
+        data: {
+          name: "Guest" + Math.floor(Math.random() * 1000),
+          message: '',
+          ws: null
+        },
+        methods: {
+          onSubmit: function() {
+              var payload = {
+                name: this.name,
+                message: this.message
+              };
+              this.ws.send(JSON.stringify(payload))
+              this.message = "";
+          },
+          onMessage: function(msg) {
+            var payload = JSON.parse(msg.data)
+            this.addMessage(payload);
+          },
+          addMessage: function(payload) {
+            var line = new Date(payload.CreatedAt).toLocaleTimeString() + " <" + payload.name + "> " + payload.message + "\n";
+            var div = document.getElementById("chat");
+            div.innerText += line;
+            div.scrollTop = div.scrollHeight;
+          },
+          loadHistory: function() {
+            var self = this;
+            axios.get('/history')
+              .then(function (response) {
+                for (var i = 0; i < response.data.length; i++) {
+                    self.addMessage(response.data[i]);
+                }
+              })
+              .catch(function (error) {
+                console.log("Failed to fetch history:", error);
+              });
+          }
+        },
+        mounted: function() {
+          this.loadHistory();
+          var url = "ws://" + window.location.host + "/ws";
+          this.ws = new WebSocket(url);
+          this.ws.onmessage = this.onMessage;
+        }
+      });
+    </script>
+  </body>
+</html>
